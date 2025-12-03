@@ -1,4 +1,4 @@
-import { renderDashboard, type UsageRow } from "./dashboard";
+import { renderDashboard, type UsageRow, type MonthlyUsagePoint } from "./dashboard";
 
 interface Env {
   DB: D1Database;
@@ -102,7 +102,8 @@ async function triggerNow(env: Env): Promise<Response> {
 async function renderHome(env: Env): Promise<Response> {
   const latest = await getLatestUsageRow(env);
   const todaysEntry = latest && isSameColomboDay(latest.timestamp) ? latest : null;
-  const html = renderDashboard({ latest: todaysEntry, dailyLimitGb: 10 });
+  const monthly = await getMonthlyUsage(env);
+  const html = renderDashboard({ latest: todaysEntry, dailyLimitGb: 10, monthly });
   return new Response(html, {
     headers: { "content-type": "text/html; charset=utf-8" }
   });
@@ -222,6 +223,32 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
+async function getMonthlyUsage(env: Env): Promise<MonthlyUsagePoint[]> {
+  const { startUtc, endUtc, dayKeys } = getColomboMonthBounds(new Date());
+  const query = `
+    SELECT strftime('%Y-%m-%d', datetime(timestamp, '+5 hours 30 minutes')) AS colombo_day,
+           MAX(vas_used_gb) AS vas_used
+    FROM usage_log
+    WHERE timestamp >= ? AND timestamp < ?
+    GROUP BY colombo_day
+  `;
+
+  const result = await env.DB.prepare(query).bind(startUtc.toISOString(), endUtc.toISOString()).all();
+  const map = new Map<string, number>();
+  for (const row of result.results ?? []) {
+    const dayKey = row.colombo_day as string | null;
+    if (!dayKey) continue;
+    const value = Number(row.vas_used ?? 0);
+    map.set(dayKey, Number.isFinite(value) ? value : 0);
+  }
+
+  return dayKeys.map((dayKey) => ({
+    dayKey,
+    label: formatDayLabel(dayKey),
+    vasUsed: map.get(dayKey) ?? 0
+  }));
+}
+
 async function getLatestUsageRow(env: Env): Promise<UsageRow | null> {
   const result = await env.DB.prepare(
     `SELECT timestamp, package_name, used_gb, vas_used_gb
@@ -245,4 +272,32 @@ function isSameColomboDay(timestamp: string): boolean {
   const todayKey = formatter.format(new Date());
   const tsKey = formatter.format(new Date(timestamp));
   return todayKey === tsKey;
+}
+
+const COLOMBO_OFFSET_MINUTES = 330;
+
+function getColomboMonthBounds(reference: Date) {
+  const offsetMs = COLOMBO_OFFSET_MINUTES * 60 * 1000;
+  const shifted = new Date(reference.getTime() + offsetMs);
+  const year = shifted.getUTCFullYear();
+  const month = shifted.getUTCMonth();
+
+  const startColomboUtc = Date.UTC(year, month, 1);
+  const endColomboUtc = Date.UTC(year, month + 1, 1);
+
+  const startUtc = new Date(startColomboUtc - offsetMs);
+  const endUtc = new Date(endColomboUtc - offsetMs);
+
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const dayKeys: string[] = [];
+  for (let day = 1; day <= daysInMonth; day++) {
+    dayKeys.push(`${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
+  }
+
+  return { startUtc, endUtc, dayKeys };
+}
+
+function formatDayLabel(dayKey: string): string {
+  const date = new Date(`${dayKey}T00:00:00+05:30`);
+  return date.toLocaleDateString("en-US", { day: "numeric" });
 }

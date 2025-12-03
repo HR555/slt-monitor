@@ -1,6 +1,7 @@
 export type DashboardProps = {
   latest: UsageRow | null;
   dailyLimitGb: number;
+  monthly: MonthlyUsagePoint[];
 };
 
 export type UsageRow = {
@@ -10,7 +11,13 @@ export type UsageRow = {
   vas_used_gb: number | null;
 };
 
-export function renderDashboard({ latest, dailyLimitGb }: DashboardProps): string {
+export type MonthlyUsagePoint = {
+  dayKey: string;
+  label: string;
+  vasUsed: number;
+};
+
+export function renderDashboard({ latest, dailyLimitGb, monthly }: DashboardProps): string {
   const vasUsed = latest?.vas_used_gb ?? 0;
   const baseUsed = latest?.used_gb ?? 0;
   const remaining = Math.max(dailyLimitGb - vasUsed, 0);
@@ -41,6 +48,17 @@ export function renderDashboard({ latest, dailyLimitGb }: DashboardProps): strin
     .meta-item:nth-child(2) { background: #ecfeff; color: #047481; }
     .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; display: block; margin-bottom: 6px; }
     .value { font-size: 1.2rem; font-weight: 600; }
+    .chart { margin-top: 28px; }
+    .chart-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+    .chart-title { font-weight: 600; color: #243b53; }
+    .chart-subtitle { color: #94a3b8; font-size: 0.9rem; margin: 0; }
+    .chart-bars { display: flex; gap: 10px; align-items: flex-end; min-height: 150px; overflow-x: auto; padding-bottom: 8px; }
+    .chart-bar { flex: 1; min-width: 28px; text-align: center; color: #94a3b8; font-size: 0.75rem; }
+    .chart-bar .bar-column { position: relative; height: 120px; display: flex; flex-direction: column; justify-content: flex-end; }
+    .chart-bar .bar-value { font-size: 0.7rem; margin-bottom: 6px; color: #475569; }
+    .chart-bar .bar-track { background: #e9eff7; border-radius: 999px; width: 16px; height: 100%; margin: 0 auto; position: relative; overflow: hidden; }
+    .chart-bar .column-fill { position: absolute; bottom: 0; left: 0; width: 100%; border-radius: inherit; background: linear-gradient(180deg, #a5b4fc, #fbcfe8); transition: height 0.3s ease; }
+    .chart-bar .bar-label { margin-top: 6px; display: block; color: #94a3b8; }
     .footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
     button { border: none; border-radius: 12px; padding: 12px 18px; font-weight: 600; cursor: pointer; background: #a5b4fc; color: #1f2a37; transition: transform 0.2s ease, opacity 0.2s ease; }
     button:hover { opacity: 0.9; transform: translateY(-1px); }
@@ -51,7 +69,7 @@ export function renderDashboard({ latest, dailyLimitGb }: DashboardProps): strin
 </head>
 <body>
   <main class="card">
-    <h1>VAS Usage Today</h1>
+    <h1>Data Usage Today</h1>
     <p>${packageName}</p>
 
     ${
@@ -76,6 +94,38 @@ export function renderDashboard({ latest, dailyLimitGb }: DashboardProps): strin
         `
         : `<div class="empty">No usage entries recorded yet.</div>`
     }
+
+    <section class="chart">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">This Month</div>
+          <p class="chart-subtitle">Daily VAS usage snapshot</p>
+        </div>
+      </div>
+      <div class="chart-bars">
+        ${
+          monthly.length
+            ? monthly
+                .map(
+                  (point) => `
+        <div class="chart-bar">
+          <div class="bar-column">
+            <span class="bar-value">${point.vasUsed.toFixed(1)} GB</span>
+            <div class="bar-track">
+              <div class="column-fill" style="height:${Math.min(
+                (point.vasUsed / dailyLimitGb) * 100,
+                100
+              ).toFixed(1)}%"></div>
+            </div>
+          </div>
+          <span class="bar-label">${point.label}</span>
+        </div>`
+                )
+                .join("")
+            : `<div class="empty">No samples for this month yet.</div>`
+        }
+      </div>
+    </section>
 
     <footer class="footer">
       <button id="triggerBtn">Trigger Fetch</button>
