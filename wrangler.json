@@ -1,0 +1,16 @@
+{
+  "compatibility_date": "2025-10-08",
+  "main": "src/index.ts",
+  "name": "slt-monitor",
+  "upload_source_maps": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_id": "6aef7a5a-aafa-495b-ab8a-c9178e563c9e",
+      "database_name": "slt-usage-reports"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
