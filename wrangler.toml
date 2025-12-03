@@ -1,0 +1,17 @@
+name = "slt-monitor"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+migrations_dir = "migrations"
+
+[vars]
+SLT_SUBSCRIBER_ID = "94312270317"
+SLT_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+
+[triggers]
+crons = ["0 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "slt-usage-reports"
+database_id = "6aef7a5a-aafa-495b-ab8a-c9178e563c9e"
+

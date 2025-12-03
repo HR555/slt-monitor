@@ -1,14 +1,210 @@
-import { renderHtml } from "./renderHtml";
+interface Env {
+  DB: D1Database;
+  SLT_SUBSCRIBER_ID: string;
+  SLT_AUTH_TOKEN: string;
+  SLT_USER_AGENT?: string;
+}
+
+const DEFAULT_USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36";
+
+const JSON_HEADERS = {
+  "content-type": "application/json; charset=utf-8",
+  "Access-Control-Allow-Origin": "*"
+};
+
+type UsagePayload = {
+  isSuccess: boolean;
+  dataBundle?: {
+    status?: string;
+    reported_time?: string;
+    my_package_summary?: Summary;
+    vas_data_summary?: Summary;
+    my_package_info?: {
+      package_name?: string;
+      usageDetails?: UsageDetail[];
+      reported_time?: string;
+    };
+  };
+  errorMessage?: string | null;
+  errorMessege?: string | null;
+};
+
+type Summary = {
+  limit?: string | null;
+  used?: string | null;
+  volume_unit?: string | null;
+};
+
+type UsageDetail = {
+  name?: string;
+  used?: string | null;
+  volume_unit?: string | null;
+};
+
+type UsageRecord = {
+  timestamp: string;
+  packageName: string | null;
+  usedGb: number | null;
+  vasUsedGb: number | null;
+  raw: UsagePayload;
+};
 
 export default {
-  async fetch(request, env) {
-    const stmt = env.DB.prepare("SELECT * FROM comments LIMIT 3");
-    const { results } = await stmt.all();
+  async fetch(request: Request, env: Env): Promise<Response> {
+    if (request.method === "OPTIONS") {
+      return new Response(null, { headers: JSON_HEADERS });
+    }
 
-    return new Response(renderHtml(JSON.stringify(results, null, 2)), {
-      headers: {
-        "content-type": "text/html",
-      },
-    });
+    const url = new URL(request.url);
+    switch (url.pathname) {
+      case "/usage":
+        return getUsage(env, url);
+      case "/trigger":
+        return triggerNow(env);
+      case "/health":
+        return new Response("ok", { status: 200 });
+      default:
+        return new Response(
+          JSON.stringify({
+            message: "SLT usage monitor",
+            endpoints: ["/usage?days=7", "/trigger", "/health"],
+            cron: "0 * * * *"
+          }),
+          { headers: JSON_HEADERS }
+        );
+    }
   },
-} satisfies ExportedHandler<Env>;
+
+  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(recordUsage(env));
+  }
+};
+
+async function triggerNow(env: Env): Promise<Response> {
+  try {
+    const record = await recordUsage(env);
+    return new Response(JSON.stringify({ stored: true, record }), {
+      headers: JSON_HEADERS
+    });
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ stored: false, error: getErrorMessage(error) }),
+      { status: 500, headers: JSON_HEADERS }
+    );
+  }
+}
+
+async function getUsage(env: Env, url: URL): Promise<Response> {
+  const daysParam = url.searchParams.get("days");
+  const limitDays = Number.isFinite(Number(daysParam)) ? Number(daysParam) : 7;
+  const days = limitDays > 0 ? limitDays : 7;
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  const query = `
+    SELECT id, timestamp, package_name, used_gb, vas_used_gb
+    FROM usage_log
+    WHERE timestamp >= ?
+    ORDER BY timestamp DESC
+  `;
+
+  const result = await env.DB.prepare(query).bind(since).all();
+  return new Response(
+    JSON.stringify({
+      count: result.results?.length ?? 0,
+      since,
+      rows: result.results ?? []
+    }),
+    { headers: JSON_HEADERS }
+  );
+}
+
+async function recordUsage(env: Env): Promise<UsageRecord> {
+  const payload = await fetchUsagePayload(env);
+  if (!payload.isSuccess) {
+    throw new Error(payload.errorMessage ?? payload.errorMessege ?? "Unknown SLT API error");
+  }
+
+  const record = transformPayload(payload);
+
+  await env.DB.prepare(
+    `INSERT INTO usage_log (timestamp, package_name, used_gb, vas_used_gb, raw_json)
+     VALUES (?, ?, ?, ?, ?)`
+  )
+    .bind(record.timestamp, record.packageName, record.usedGb, record.vasUsedGb, JSON.stringify(record.raw))
+    .run();
+
+  return record;
+}
+
+async function fetchUsagePayload(env: Env): Promise<UsagePayload> {
+  const subscriberID = env.SLT_SUBSCRIBER_ID;
+  if (!subscriberID) {
+    throw new Error("Missing SLT_SUBSCRIBER_ID");
+  }
+
+  if (!env.SLT_AUTH_TOKEN) {
+    throw new Error("Missing SLT_AUTH_TOKEN secret");
+  }
+
+  const url = `https://omniscapp.slt.lk/slt/ext/api/BBVAS/UsageSummary?subscriberID=${encodeURIComponent(
+    subscriberID
+  )}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      Authorization: `bearer ${env.SLT_AUTH_TOKEN}`,
+      Connection: "keep-alive",
+      Origin: "https://myslt.slt.lk",
+      Referer: "https://myslt.slt.lk/",
+      "Sec-Fetch-Dest": "empty",
+      "Sec-Fetch-Mode": "cors",
+      "Sec-Fetch-Site": "same-site",
+      "User-Agent": env.SLT_USER_AGENT ?? DEFAULT_USER_AGENT,
+      "X-IBM-Client-Id": "b7402e9d66808f762ccedbe42c20668e",
+      "sec-ch-ua": '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": '"macOS"'
+    }
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`SLT API failed with ${response.status}: ${text}`);
+  }
+
+  return (await response.json()) as UsagePayload;
+}
+
+function transformPayload(payload: UsagePayload): UsageRecord {
+  const now = new Date().toISOString();
+  const packageName = payload.dataBundle?.my_package_info?.package_name ?? null;
+  const usedSummary = payload.dataBundle?.my_package_summary?.used;
+  const vasSummary = payload.dataBundle?.vas_data_summary?.used;
+  const fallbackUsage = payload.dataBundle?.my_package_info?.usageDetails?.[0]?.used;
+
+  return {
+    timestamp: now,
+    packageName,
+    usedGb: parseNullableNumber(usedSummary) ?? parseNullableNumber(fallbackUsage),
+    vasUsedGb: parseNullableNumber(vasSummary),
+    raw: payload
+  };
+}
+
+function parseNullableNumber(value?: string | null): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}

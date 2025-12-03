@@ -1,59 +1,62 @@
-# Worker + D1 Database
+# SLT Usage Monitor
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/d1-template)
+Cloudflare Worker that polls the SLT UsageSummary API, stores hourly snapshots in a D1 database, and exposes lightweight endpoints for manual triggering and historical queries.
 
-![Worker + D1 Template Preview](https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/cb7cb0a9-6102-4822-633c-b76b7bb25900/public)
+## Prerequisites
 
-<!-- dash-content-start -->
+- Cloudflare account with Workers + D1 enabled
+- An SLT account that can access the UsageSummary API
+- `wrangler` CLI (installed via `npm install -g wrangler` or `npx wrangler`)
 
-D1 is Cloudflare's native serverless SQL database ([docs](https://developers.cloudflare.com/d1/)). This project demonstrates using a Worker with a D1 binding to execute a SQL statement. A simple frontend displays the result of this query:
+## Setup
 
-```SQL
-SELECT * FROM comments LIMIT 3;
-```
-
-The D1 database is initialized with a `comments` table and this data:
-
-```SQL
-INSERT INTO comments (author, content)
-VALUES
-    ('Kristian', 'Congrats!'),
-    ('Serena', 'Great job!'),
-    ('Max', 'Keep up the good work!')
-;
-```
-
-> [!IMPORTANT]
-> When using C3 to create this project, select "no" when it asks if you want to deploy. You need to follow this project's [setup steps](https://github.com/cloudflare/templates/tree/main/d1-template#setup-steps) before deploying.
-
-<!-- dash-content-end -->
-
-## Getting Started
-
-Outside of this repo, you can start a new project with this template using [C3](https://developers.cloudflare.com/pages/get-started/c3/) (the `create-cloudflare` CLI):
-
-```
-npm create cloudflare@latest -- --template=cloudflare/templates/d1-template
-```
-
-A live public deployment of this template is available at [https://d1-template.templates.workers.dev](https://d1-template.templates.workers.dev)
-
-## Setup Steps
-
-1. Install the project dependencies with a package manager of your choice:
+1. **Install dependencies**
    ```bash
    npm install
    ```
-2. Create a [D1 database](https://developers.cloudflare.com/d1/get-started/) with the name "d1-template-database":
+
+2. **Create the D1 database**
    ```bash
-   npx wrangler d1 create d1-template-database
+   wrangler d1 create slt-usage-reports
    ```
-   ...and update the `database_id` field in `wrangler.json` with the new database ID.
-3. Run the following db migration to initialize the database (notice the `migrations` directory in this project):
+   Copy the generated `database_id` and update `wrangler.toml`.
+
+3. **Run the migration**
    ```bash
-   npx wrangler d1 migrations apply --remote d1-template-database
+   npm run migrate
    ```
-4. Deploy the project!
+
+4. **Configure secrets**
    ```bash
-   npx wrangler deploy
+   wrangler secret put SLT_AUTH_TOKEN
    ```
+   Optional (overrides default): `wrangler secret put SLT_USER_AGENT`
+
+The non-secret subscriber ID lives in `wrangler.toml` under `[vars]`.
+
+## Development
+
+```bash
+npm run dev
+```
+
+This starts the Worker locally with a D1 Dev instance.
+
+## Deployment
+
+```bash
+npm run deploy
+```
+
+When pushed to `main`, GitHub Actions executes the same command. Add the following repository secrets:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+
+## Endpoints
+
+- `GET /usage?days=7` – Returns stored rows within the past _n_ days.
+- `POST/GET /trigger` – Fire the SLT request immediately and persist the result.
+- `GET /health` – Simple health check.
+
+The cron trigger defined in `wrangler.toml` runs every hour (`0 * * * *`) to capture usage without manual intervention.
