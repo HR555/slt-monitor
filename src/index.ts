@@ -1,3 +1,5 @@
+import { renderDashboard, type UsageRow } from "./dashboard";
+
 interface Env {
   DB: D1Database;
   SLT_SUBSCRIBER_ID: string;
@@ -58,6 +60,8 @@ export default {
 
     const url = new URL(request.url);
     switch (url.pathname) {
+      case "/":
+        return renderHome(env);
       case "/usage":
         return getUsage(env, url);
       case "/trigger":
@@ -93,6 +97,15 @@ async function triggerNow(env: Env): Promise<Response> {
       { status: 500, headers: JSON_HEADERS }
     );
   }
+}
+
+async function renderHome(env: Env): Promise<Response> {
+  const latest = await getLatestUsageRow(env);
+  const todaysEntry = latest && isSameColomboDay(latest.timestamp) ? latest : null;
+  const html = renderDashboard({ latest: todaysEntry, dailyLimitGb: 10 });
+  return new Response(html, {
+    headers: { "content-type": "text/html; charset=utf-8" }
+  });
 }
 
 async function getUsage(env: Env, url: URL): Promise<Response> {
@@ -207,4 +220,29 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+async function getLatestUsageRow(env: Env): Promise<UsageRow | null> {
+  const result = await env.DB.prepare(
+    `SELECT timestamp, package_name, used_gb, vas_used_gb
+     FROM usage_log
+     ORDER BY datetime(timestamp) DESC
+     LIMIT 1`
+  ).all();
+
+  const row = (result.results?.[0] as UsageRow | undefined) ?? null;
+  return row;
+}
+
+function isSameColomboDay(timestamp: string): boolean {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Colombo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+
+  const todayKey = formatter.format(new Date());
+  const tsKey = formatter.format(new Date(timestamp));
+  return todayKey === tsKey;
 }
