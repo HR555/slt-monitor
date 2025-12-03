@@ -1,4 +1,4 @@
-# SLT Usage Monitor
+# Worker + D1 Database
 
 Cloudflare Worker that polls the SLT UsageSummary API, stores hourly snapshots in a D1 database, and exposes lightweight endpoints for manual triggering and historical queries.
 

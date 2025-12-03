@@ -4,10 +4,14 @@
   "description": "Cloudflare Worker that fetches SLT usage data and stores it in D1.",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
+    "cf-typegen": "wrangler types",
+    "check": "tsc && wrangler deploy --dry-run",
     "deploy": "wrangler deploy",
+    "dev": "npm run seedLocalD1 && wrangler dev",
     "migrate": "wrangler d1 migrations apply slt-usage-reports",
-    "test": "wrangler deploy --dry-run"
+    "test": "wrangler deploy --dry-run",
+    "predeploy": "wrangler d1 migrations apply DB --remote",
+    "seedLocalD1": "wrangler d1 migrations apply DB --local"
   },
   "repository": {
     "type": "git",
