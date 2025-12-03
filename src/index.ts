@@ -73,7 +73,7 @@ export default {
           JSON.stringify({
             message: "SLT usage monitor",
             endpoints: ["/usage?days=7", "/trigger", "/health"],
-            cron: "0 * * * *"
+            crons: ["29 * * * *", "59 * * * *"]
           }),
           { headers: JSON_HEADERS }
         );

@@ -59,4 +59,4 @@ When pushed to `main`, GitHub Actions executes the same command. Add the followi
 - `POST/GET /trigger` – Fire the SLT request immediately and persist the result.
 - `GET /health` – Simple health check.
 
-The cron trigger defined in `wrangler.toml` runs every hour (`0 * * * *`) to capture usage without manual intervention.
+The cron scheduler defined in `wrangler.toml` runs twice every hour (at `:29` and `:59`) so that a fresh snapshot is captured frequently and a final one lands at 23:59 just before the daily reset.
