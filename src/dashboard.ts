@@ -11,12 +11,12 @@ export type UsageRow = {
 };
 
 export function renderDashboard({ latest, dailyLimitGb }: DashboardProps): string {
-  const used = latest?.used_gb ?? 0;
-  const remaining = Math.max(dailyLimitGb - used, 0);
-  const percentage = Math.min((used / dailyLimitGb) * 100, 100);
+  const vasUsed = latest?.vas_used_gb ?? 0;
+  const baseUsed = latest?.used_gb ?? 0;
+  const remaining = Math.max(dailyLimitGb - vasUsed, 0);
+  const percentage = Math.min((vasUsed / dailyLimitGb) * 100, 100);
   const reportedAt = latest ? new Date(latest.timestamp).toLocaleString("en-GB", { timeZone: "Asia/Colombo" }) : "—";
   const packageName = latest?.package_name ?? "Unknown package";
-  const vasUsed = latest?.vas_used_gb ?? 0;
 
   return `
 <!DOCTYPE html>
@@ -51,14 +51,14 @@ export function renderDashboard({ latest, dailyLimitGb }: DashboardProps): strin
 </head>
 <body>
   <main class="card">
-    <h1>SLT Usage Today</h1>
+    <h1>VAS Usage Today</h1>
     <p>${packageName}</p>
 
     ${
       latest
         ? `
     <section class="usage">
-      <div class="usage-value">${used.toFixed(2)} GB</div>
+      <div class="usage-value">${vasUsed.toFixed(2)} GB</div>
       <div class="limit">Daily allocation ${dailyLimitGb} GB · Remaining ${remaining.toFixed(2)} GB</div>
       <div class="bar"><div class="fill"></div></div>
     </section>
@@ -69,8 +69,8 @@ export function renderDashboard({ latest, dailyLimitGb }: DashboardProps): strin
         <span class="value">${reportedAt}</span>
       </div>
       <div class="meta-item">
-        <span class="label">VAS Usage</span>
-        <span class="value">${vasUsed.toFixed(2)} GB</span>
+        <span class="label">Base Usage</span>
+        <span class="value">${baseUsed.toFixed(2)} GB</span>
       </div>
     </section>
         `
