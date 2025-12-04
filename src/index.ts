@@ -100,8 +100,7 @@ async function triggerNow(env: Env): Promise<Response> {
 }
 
 async function renderHome(env: Env): Promise<Response> {
-  const latest = await getLatestUsageRow(env);
-  const todaysEntry = latest && isSameColomboDay(latest.timestamp) ? latest : null;
+  const todaysEntry = await getTodaysUsageRow(env);
   const monthly = await getMonthlyUsage(env);
   const html = renderDashboard({ latest: todaysEntry, dailyLimitGb: 10, monthly });
   return new Response(html, {
@@ -249,22 +248,19 @@ async function getMonthlyUsage(env: Env): Promise<MonthlyUsagePoint[]> {
   }));
 }
 
-async function getLatestUsageRow(env: Env): Promise<UsageRow | null> {
+async function getTodaysUsageRow(env: Env): Promise<UsageRow | null> {
+  const { startUtc, endUtc } = getColomboDayBounds(new Date());
   const result = await env.DB.prepare(
     `SELECT timestamp, package_name, used_gb, vas_used_gb
      FROM usage_log
+     WHERE timestamp >= ? AND timestamp < ?
      ORDER BY datetime(timestamp) DESC
      LIMIT 1`
-  ).all();
+  )
+    .bind(startUtc.toISOString(), endUtc.toISOString())
+    .all();
 
-  const row = (result.results?.[0] as UsageRow | undefined) ?? null;
-  return row;
-}
-
-function isSameColomboDay(timestamp: string): boolean {
-  const todayKey = formatColomboDayKey(new Date());
-  const tsKey = formatColomboDayKey(new Date(timestamp));
-  return todayKey === tsKey;
+  return (result.results?.[0] as UsageRow | undefined) ?? null;
 }
 
 const COLOMBO_OFFSET_MINUTES = 330;
@@ -294,6 +290,22 @@ function getColomboMonthBounds(reference: Date) {
   }
 
   return { startUtc, endUtc, dayKeys };
+}
+
+function getColomboDayBounds(reference: Date) {
+  const offsetMs = COLOMBO_OFFSET_MINUTES * 60 * 1000;
+  const shifted = new Date(reference.getTime() + offsetMs);
+  const year = shifted.getUTCFullYear();
+  const month = shifted.getUTCMonth();
+  const day = shifted.getUTCDate();
+
+  const startColomboUtc = Date.UTC(year, month, day);
+  const endColomboUtc = Date.UTC(year, month, day + 1);
+
+  const startUtc = new Date(startColomboUtc - offsetMs);
+  const endUtc = new Date(endColomboUtc - offsetMs);
+
+  return { startUtc, endUtc };
 }
 
 function formatDayLabel(dayKey: string): string {
