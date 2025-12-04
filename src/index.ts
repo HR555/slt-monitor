@@ -1,4 +1,9 @@
-import { renderDashboard, type UsageRow, type MonthlyUsagePoint } from "./dashboard";
+import {
+  renderDashboard,
+  type UsageRow,
+  type MonthlyUsagePoint,
+  type DailyUsagePoint
+} from "./dashboard";
 
 interface Env {
   DB: D1Database;
@@ -102,7 +107,8 @@ async function triggerNow(env: Env): Promise<Response> {
 async function renderHome(env: Env): Promise<Response> {
   const todaysEntry = await getTodaysUsageRow(env);
   const monthly = await getMonthlyUsage(env);
-  const html = renderDashboard({ latest: todaysEntry, dailyLimitGb: 10, monthly });
+  const intraday = await getDailyUsageSeries(env);
+  const html = renderDashboard({ latest: todaysEntry, dailyLimitGb: 10, intraday, monthly });
   return new Response(html, {
     headers: { "content-type": "text/html; charset=utf-8" }
   });
@@ -248,6 +254,41 @@ async function getMonthlyUsage(env: Env): Promise<MonthlyUsagePoint[]> {
   }));
 }
 
+async function getDailyUsageSeries(env: Env): Promise<DailyUsagePoint[]> {
+  const { startUtc, endUtc } = getColomboDayBounds(new Date());
+  const rows = await env.DB.prepare(
+    `SELECT timestamp, vas_used_gb
+     FROM usage_log
+     WHERE timestamp >= ? AND timestamp < ?
+     ORDER BY datetime(timestamp) ASC`
+  )
+    .bind(startUtc.toISOString(), endUtc.toISOString())
+    .all();
+
+  const slotInfo = buildIntradaySlots(startUtc, endUtc);
+  const entries = (rows.results ?? [])
+    .map((row) => {
+      const ts = row.timestamp as string | undefined;
+      if (!ts) return null;
+      return {
+        date: new Date(ts),
+        value: parseNullableNumber(row.vas_used_gb as number | string | null) ?? 0
+      };
+    })
+    .filter((entry): entry is { date: Date; value: number } => entry !== null);
+
+  let cursor = 0;
+  let currentValue = 0;
+
+  return slotInfo.map(({ slotTime, label }) => {
+    while (cursor < entries.length && entries[cursor].date <= slotTime) {
+      currentValue = entries[cursor].value;
+      cursor++;
+    }
+    return { label, vasUsed: currentValue };
+  });
+}
+
 async function getTodaysUsageRow(env: Env): Promise<UsageRow | null> {
   const { startUtc, endUtc } = getColomboDayBounds(new Date());
   const result = await env.DB.prepare(
@@ -269,6 +310,11 @@ const COLOMBO_DAY_FORMATTER = new Intl.DateTimeFormat("en-CA", {
   year: "numeric",
   month: "2-digit",
   day: "2-digit"
+});
+const COLOMBO_TIME_FORMATTER = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Colombo",
+  hour: "2-digit",
+  minute: "2-digit"
 });
 
 function getColomboMonthBounds(reference: Date) {
@@ -315,4 +361,21 @@ function formatDayLabel(dayKey: string): string {
 
 function formatColomboDayKey(date: Date): string {
   return COLOMBO_DAY_FORMATTER.format(date);
+}
+
+function buildIntradaySlots(startUtc: Date, endUtc: Date) {
+  const slots: { slotTime: Date; label: string }[] = [];
+  const firstOffsetMs = 29 * 60 * 1000;
+  const intervalMs = 30 * 60 * 1000;
+  const totalSlots = 48;
+  for (let i = 0; i < totalSlots; i++) {
+    const slotTime = new Date(startUtc.getTime() + firstOffsetMs + i * intervalMs);
+    if (slotTime > endUtc) break;
+    slots.push({ slotTime, label: formatColomboTimeLabel(slotTime) });
+  }
+  return slots;
+}
+
+function formatColomboTimeLabel(date: Date): string {
+  return COLOMBO_TIME_FORMATTER.format(date);
 }

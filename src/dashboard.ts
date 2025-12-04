@@ -1,6 +1,7 @@
 export type DashboardProps = {
   latest: UsageRow | null;
   dailyLimitGb: number;
+  intraday: DailyUsagePoint[];
   monthly: MonthlyUsagePoint[];
 };
 
@@ -11,13 +12,18 @@ export type UsageRow = {
   vas_used_gb: number | null;
 };
 
+export type DailyUsagePoint = {
+  label: string;
+  vasUsed: number;
+};
+
 export type MonthlyUsagePoint = {
   dayKey: string;
   label: string;
   vasUsed: number;
 };
 
-export function renderDashboard({ latest, dailyLimitGb, monthly }: DashboardProps): string {
+export function renderDashboard({ latest, dailyLimitGb, intraday, monthly }: DashboardProps): string {
   const vasUsed = latest?.vas_used_gb ?? 0;
   const baseUsed = latest?.used_gb ?? 0;
   const remaining = Math.max(dailyLimitGb - vasUsed, 0);
@@ -52,6 +58,14 @@ export function renderDashboard({ latest, dailyLimitGb, monthly }: DashboardProp
     .chart-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
     .chart-title { font-weight: 600; color: #243b53; }
     .chart-subtitle { color: #94a3b8; font-size: 0.9rem; margin: 0; }
+    .line-card { margin-top: 16px; background: #f8f5ff; padding: 18px; border-radius: 16px; border: 1px solid #ece8ff; }
+    .line-wrapper { width: 100%; height: 160px; position: relative; }
+    svg { width: 100%; height: 100%; }
+    .line-grid line { stroke: rgba(148, 163, 184, 0.3); stroke-width: 0.4; }
+    .line-path { fill: none; stroke: #a5b4fc; stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; }
+    .line-fill { fill: url(#lineGradient); opacity: 0.45; }
+    .axis { display: grid; grid-template-columns: repeat(auto-fit, minmax(40px, 1fr)); gap: 4px; margin-top: 12px; font-size: 0.7rem; color: #94a3b8; text-align: center; }
+    .axis span { white-space: nowrap; }
     .chart-bars { display: flex; gap: 10px; align-items: flex-end; min-height: 150px; overflow-x: auto; padding-bottom: 8px; }
     .chart-bar { flex: 1; min-width: 28px; text-align: center; color: #94a3b8; font-size: 0.75rem; }
     .chart-bar .bar-column { position: relative; height: 120px; display: flex; flex-direction: column; justify-content: flex-end; }
@@ -94,6 +108,45 @@ export function renderDashboard({ latest, dailyLimitGb, monthly }: DashboardProp
         `
         : `<div class="empty">No usage entries recorded yet.</div>`
     }
+
+    <section class="chart">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Today</div>
+          <p class="chart-subtitle">30 min snapshots</p>
+        </div>
+      </div>
+      <div class="line-card">
+        ${
+          intraday.length
+            ? `
+        <div class="line-wrapper">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#a5b4fc" stop-opacity="0.7" />
+                <stop offset="100%" stop-color="#fbcfe8" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <g class="line-grid">
+              <line x1="0" y1="100" x2="100" y2="100" />
+              <line x1="0" y1="50" x2="100" y2="50" />
+              <line x1="0" y1="0" x2="100" y2="0" />
+            </g>
+            <path class="line-fill" d="${lineArea(intraday, dailyLimitGb)}" />
+            <polyline class="line-path" points="${linePoints(intraday, dailyLimitGb)}" />
+          </svg>
+        </div>
+        <div class="axis">
+          ${intraday
+            .map((point, idx) => (idx % 4 === 0 || idx === intraday.length - 1 ? `<span>${point.label}</span>` : ""))
+            .join("")}
+        </div>
+            `
+            : `<div class="empty">No samples for today yet.</div>`
+        }
+      </div>
+    </section>
 
     <section class="chart">
       <div class="chart-header">
@@ -156,5 +209,30 @@ export function renderDashboard({ latest, dailyLimitGb, monthly }: DashboardProp
 </body>
 </html>
 `;
+}
+
+function linePoints(series: DailyUsagePoint[], limit: number): string {
+  if (series.length === 0) return "";
+  const lastIndex = series.length - 1 || 1;
+  return series
+    .map((point, idx) => {
+      const x = (idx / lastIndex) * 100;
+      const y = 100 - Math.min((point.vasUsed / limit) * 100, 100);
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(" ");
+}
+
+function lineArea(series: DailyUsagePoint[], limit: number): string {
+  if (series.length === 0) return "";
+  const lastIndex = series.length - 1 || 1;
+  const coords = series
+    .map((point, idx) => {
+      const x = (idx / lastIndex) * 100;
+      const y = 100 - Math.min((point.vasUsed / limit) * 100, 100);
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(" L");
+  return `M${coords} L100,100 L0,100 Z`;
 }
 
