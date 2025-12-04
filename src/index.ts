@@ -226,20 +226,20 @@ function getErrorMessage(error: unknown): string {
 async function getMonthlyUsage(env: Env): Promise<MonthlyUsagePoint[]> {
   const { startUtc, endUtc, dayKeys } = getColomboMonthBounds(new Date());
   const query = `
-    SELECT strftime('%Y-%m-%d', datetime(timestamp, '+5 hours 30 minutes')) AS colombo_day,
-           MAX(vas_used_gb) AS vas_used
+    SELECT timestamp, vas_used_gb
     FROM usage_log
     WHERE timestamp >= ? AND timestamp < ?
-    GROUP BY colombo_day
+    ORDER BY datetime(timestamp) ASC
   `;
 
   const result = await env.DB.prepare(query).bind(startUtc.toISOString(), endUtc.toISOString()).all();
   const map = new Map<string, number>();
   for (const row of result.results ?? []) {
-    const dayKey = row.colombo_day as string | null;
-    if (!dayKey) continue;
-    const value = Number(row.vas_used ?? 0);
-    map.set(dayKey, Number.isFinite(value) ? value : 0);
+    const ts = row.timestamp as string | null;
+    if (!ts) continue;
+    const dayKey = formatColomboDayKey(new Date(ts));
+    const value = parseNullableNumber(row.vas_used_gb as number | string | null) ?? 0;
+    map.set(dayKey, value);
   }
 
   return dayKeys.map((dayKey) => ({
@@ -262,19 +262,18 @@ async function getLatestUsageRow(env: Env): Promise<UsageRow | null> {
 }
 
 function isSameColomboDay(timestamp: string): boolean {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Colombo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  });
-
-  const todayKey = formatter.format(new Date());
-  const tsKey = formatter.format(new Date(timestamp));
+  const todayKey = formatColomboDayKey(new Date());
+  const tsKey = formatColomboDayKey(new Date(timestamp));
   return todayKey === tsKey;
 }
 
 const COLOMBO_OFFSET_MINUTES = 330;
+const COLOMBO_DAY_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Colombo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit"
+});
 
 function getColomboMonthBounds(reference: Date) {
   const offsetMs = COLOMBO_OFFSET_MINUTES * 60 * 1000;
@@ -300,4 +299,8 @@ function getColomboMonthBounds(reference: Date) {
 function formatDayLabel(dayKey: string): string {
   const date = new Date(`${dayKey}T00:00:00+05:30`);
   return date.toLocaleDateString("en-US", { day: "numeric" });
+}
+
+function formatColomboDayKey(date: Date): string {
+  return COLOMBO_DAY_FORMATTER.format(date);
 }
