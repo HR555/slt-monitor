@@ -8,8 +8,11 @@ import {
 interface Env {
   DB: D1Database;
   SLT_SUBSCRIBER_ID: string;
-  SLT_AUTH_TOKEN: string;
+  SLT_AUTH_TOKEN?: string;
   SLT_USER_AGENT?: string;
+  SLT_USERNAME?: string;
+  SLT_PASSWORD?: string;
+  SLT_CHANNEL_ID?: string;
 }
 
 const DEFAULT_USER_AGENT =
@@ -19,6 +22,12 @@ const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "Access-Control-Allow-Origin": "*"
 };
+
+const SLT_CLIENT_ID = "b7402e9d66808f762ccedbe42c20668e";
+const LOGIN_ENDPOINT = "https://omniscapp.slt.lk/slt/ext/api/Account/Login";
+const USAGE_ENDPOINT = "https://omniscapp.slt.lk/slt/ext/api/BBVAS/UsageSummary";
+
+let cachedAccessToken: string | null = null;
 
 type UsagePayload = {
   isSuccess: boolean;
@@ -35,6 +44,12 @@ type UsagePayload = {
   };
   errorMessage?: string | null;
   errorMessege?: string | null;
+};
+
+type LoginResponse = {
+  accessToken?: string;
+  refreshToken?: string;
+  message?: string;
 };
 
 type Summary = {
@@ -69,15 +84,22 @@ export default {
         return renderHome(env);
       case "/usage":
         return getUsage(env, url);
+      case "/intraday":
+        return getIntraday(env, url);
       case "/trigger":
         return triggerNow(env);
+      case "/login":
+        if (request.method !== "POST") {
+          return new Response("Method not allowed", { status: 405, headers: JSON_HEADERS });
+        }
+        return loginNow(env);
       case "/health":
         return new Response("ok", { status: 200 });
       default:
         return new Response(
           JSON.stringify({
             message: "SLT usage monitor",
-            endpoints: ["/usage?days=7", "/trigger", "/health"],
+            endpoints: ["/usage?days=7", "/intraday?day=YYYY-MM-DD", "/trigger", "/health"],
             crons: ["29 * * * *", "59 * * * *"]
           }),
           { headers: JSON_HEADERS }
@@ -104,11 +126,33 @@ async function triggerNow(env: Env): Promise<Response> {
   }
 }
 
+async function loginNow(env: Env): Promise<Response> {
+  try {
+    const token = await performSltLogin(env);
+    cachedAccessToken = token;
+    return new Response(JSON.stringify({ loggedIn: true }), { headers: JSON_HEADERS });
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ loggedIn: false, error: getErrorMessage(error) }),
+      { status: 500, headers: JSON_HEADERS }
+    );
+  }
+}
+
 async function renderHome(env: Env): Promise<Response> {
   const todaysEntry = await getTodaysUsageRow(env);
   const monthly = await getMonthlyUsage(env);
-  const intraday = await getDailyUsageSeries(env);
-  const html = renderDashboard({ latest: todaysEntry, dailyLimitGb: 10, intraday, monthly });
+  const referenceDate = new Date();
+  const intraday = await getDailyUsageSeries(env, referenceDate);
+  const dayKey = formatColomboDayKey(referenceDate);
+  const html = renderDashboard({
+    latest: todaysEntry,
+    dailyLimitGb: 10,
+    intraday,
+    monthly,
+    selectedDayKey: dayKey,
+    todayDayKey: dayKey
+  });
   return new Response(html, {
     headers: { "content-type": "text/html; charset=utf-8" }
   });
@@ -138,6 +182,26 @@ async function getUsage(env: Env, url: URL): Promise<Response> {
   );
 }
 
+async function getIntraday(env: Env, url: URL): Promise<Response> {
+  const dayParam = url.searchParams.get("day");
+  const reference = dayParam ? parseColomboDayParam(dayParam) : new Date();
+  if (!reference) {
+    return new Response(JSON.stringify({ error: "Invalid day parameter" }), {
+      status: 400,
+      headers: JSON_HEADERS
+    });
+  }
+
+  const series = await getDailyUsageSeries(env, reference);
+  return new Response(
+    JSON.stringify({
+      dayKey: formatColomboDayKey(reference),
+      series
+    }),
+    { headers: JSON_HEADERS }
+  );
+}
+
 async function recordUsage(env: Env): Promise<UsageRecord> {
   const payload = await fetchUsagePayload(env);
   if (!payload.isSuccess) {
@@ -162,19 +226,60 @@ async function fetchUsagePayload(env: Env): Promise<UsagePayload> {
     throw new Error("Missing SLT_SUBSCRIBER_ID");
   }
 
-  if (!env.SLT_AUTH_TOKEN) {
-    throw new Error("Missing SLT_AUTH_TOKEN secret");
+  const tokensToTry = Array.from(
+    new Set(
+      [cachedAccessToken, env.SLT_AUTH_TOKEN].filter(
+        (token): token is string => typeof token === "string" && token.trim().length > 0
+      )
+    )
+  );
+
+  let lastFailure: Response | null = null;
+
+  for (const token of tokensToTry) {
+    const response = await requestUsageSummary(subscriberID, token, env);
+    if (response.ok) {
+      cachedAccessToken = token;
+      return (await response.json()) as UsagePayload;
+    }
+
+    lastFailure = response;
+    if (!isUnauthorized(response)) {
+      const text = await response.text();
+      throw new Error(`SLT API failed with ${response.status}: ${text}`);
+    }
+    break;
   }
 
-  const url = `https://omniscapp.slt.lk/slt/ext/api/BBVAS/UsageSummary?subscriberID=${encodeURIComponent(
-    subscriberID
-  )}`;
+  if (!canAutoLogin(env)) {
+    if (lastFailure) {
+      const text = await lastFailure.text();
+      throw new Error(`SLT API failed with ${lastFailure.status}: ${text}`);
+    }
+    throw new Error(
+      "No SLT auth token available. Provide SLT_AUTH_TOKEN or configure SLT_USERNAME and SLT_PASSWORD secrets for auto-login."
+    );
+  }
 
-  const response = await fetch(url, {
+  const freshToken = await performSltLogin(env);
+  cachedAccessToken = freshToken;
+  const retryResponse = await requestUsageSummary(subscriberID, freshToken, env);
+
+  if (!retryResponse.ok) {
+    const text = await retryResponse.text();
+    throw new Error(`SLT API failed after re-login with ${retryResponse.status}: ${text}`);
+  }
+
+  return (await retryResponse.json()) as UsagePayload;
+}
+
+async function requestUsageSummary(subscriberID: string, token: string, env: Env): Promise<Response> {
+  const url = `${USAGE_ENDPOINT}?subscriberID=${encodeURIComponent(subscriberID)}`;
+  return fetch(url, {
     headers: {
       Accept: "application/json, text/plain, */*",
       "Accept-Language": "en-US,en;q=0.9",
-      Authorization: `bearer ${env.SLT_AUTH_TOKEN}`,
+      Authorization: `bearer ${token}`,
       Connection: "keep-alive",
       Origin: "https://myslt.slt.lk",
       Referer: "https://myslt.slt.lk/",
@@ -182,19 +287,66 @@ async function fetchUsagePayload(env: Env): Promise<UsagePayload> {
       "Sec-Fetch-Mode": "cors",
       "Sec-Fetch-Site": "same-site",
       "User-Agent": env.SLT_USER_AGENT ?? DEFAULT_USER_AGENT,
-      "X-IBM-Client-Id": "b7402e9d66808f762ccedbe42c20668e",
+      "X-IBM-Client-Id": SLT_CLIENT_ID,
       "sec-ch-ua": '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
       "sec-ch-ua-mobile": "?0",
       "sec-ch-ua-platform": '"macOS"'
     }
   });
+}
+
+function canAutoLogin(env: Env): env is Env & { SLT_USERNAME: string; SLT_PASSWORD: string } {
+  return Boolean(env.SLT_USERNAME && env.SLT_PASSWORD);
+}
+
+async function performSltLogin(env: Env): Promise<string> {
+  if (!env.SLT_USERNAME || !env.SLT_PASSWORD) {
+    throw new Error("Missing SLT_USERNAME or SLT_PASSWORD secret");
+  }
+
+  const body = new URLSearchParams({
+    username: env.SLT_USERNAME,
+    password: env.SLT_PASSWORD,
+    channelID: env.SLT_CHANNEL_ID ?? "WEB"
+  });
+
+  const response = await fetch(LOGIN_ENDPOINT, {
+    method: "POST",
+    headers: {
+      Accept: "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Content-Type": "application/x-www-form-urlencoded",
+      Origin: "https://myslt.slt.lk",
+      Referer: "https://myslt.slt.lk/",
+      "Sec-Fetch-Dest": "empty",
+      "Sec-Fetch-Mode": "cors",
+      "Sec-Fetch-Site": "same-site",
+      "User-Agent": env.SLT_USER_AGENT ?? DEFAULT_USER_AGENT,
+      "X-IBM-Client-Id": SLT_CLIENT_ID,
+      "sec-ch-ua": '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": '"macOS"'
+    },
+    body
+  });
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`SLT API failed with ${response.status}: ${text}`);
+    throw new Error(`SLT login failed with ${response.status}: ${text}`);
   }
 
-  return (await response.json()) as UsagePayload;
+  const loginPayload = (await response.json()) as LoginResponse;
+  const accessToken = loginPayload.accessToken?.trim();
+
+  if (!accessToken) {
+    throw new Error("SLT login response did not include an accessToken");
+  }
+
+  return accessToken;
+}
+
+function isUnauthorized(response: Response): boolean {
+  return response.status === 401 || response.status === 403;
 }
 
 function transformPayload(payload: UsagePayload): UsageRecord {
@@ -213,11 +365,11 @@ function transformPayload(payload: UsagePayload): UsageRecord {
   };
 }
 
-function parseNullableNumber(value?: string | null): number | null {
+function parseNullableNumber(value?: string | number | null): number | null {
   if (value === null || value === undefined) {
     return null;
   }
-  const numeric = Number(value);
+  const numeric = typeof value === "number" ? value : Number(value);
   return Number.isFinite(numeric) ? numeric : null;
 }
 
@@ -254,8 +406,8 @@ async function getMonthlyUsage(env: Env): Promise<MonthlyUsagePoint[]> {
   }));
 }
 
-async function getDailyUsageSeries(env: Env): Promise<DailyUsagePoint[]> {
-  const { startUtc, endUtc } = getColomboDayBounds(new Date());
+async function getDailyUsageSeries(env: Env, reference: Date): Promise<DailyUsagePoint[]> {
+  const { startUtc, endUtc } = getColomboDayBounds(reference);
   const rows = await env.DB.prepare(
     `SELECT timestamp, vas_used_gb
      FROM usage_log
@@ -361,6 +513,14 @@ function formatDayLabel(dayKey: string): string {
 
 function formatColomboDayKey(date: Date): string {
   return COLOMBO_DAY_FORMATTER.format(date);
+}
+
+function parseColomboDayParam(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+  const parsed = Date.parse(`${value}T00:00:00+05:30`);
+  return Number.isNaN(parsed) ? null : new Date(parsed);
 }
 
 function buildIntradaySlots(startUtc: Date, endUtc: Date) {

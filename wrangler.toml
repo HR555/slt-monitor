@@ -15,3 +15,7 @@ binding = "DB"
 database_name = "slt-usage-reports"
 database_id = "6aef7a5a-aafa-495b-ab8a-c9178e563c9e"
 
+[[build.upload.rules]]
+globs = ["**/*.css"]
+type = "Text"
+

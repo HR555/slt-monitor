@@ -28,9 +28,13 @@ Cloudflare Worker that polls the SLT UsageSummary API, stores hourly snapshots i
 
 4. **Configure secrets**
    ```bash
-   wrangler secret put SLT_AUTH_TOKEN
+   wrangler secret put SLT_USERNAME
+   wrangler secret put SLT_PASSWORD
    ```
-   Optional (overrides default): `wrangler secret put SLT_USER_AGENT`
+   Optional overrides:
+   - `wrangler secret put SLT_CHANNEL_ID` (defaults to `WEB`)
+   - `wrangler secret put SLT_AUTH_TOKEN` (used as a bootstrap token before auto-login kicks in)
+   - `wrangler secret put SLT_USER_AGENT`
 
 The non-secret subscriber ID lives in `wrangler.toml` under `[vars]`.
 
@@ -57,6 +61,7 @@ When pushed to `main`, GitHub Actions executes the same command. Add the followi
 
 - `GET /usage?days=7` – Returns stored rows within the past _n_ days.
 - `POST/GET /trigger` – Fire the SLT request immediately and persist the result.
+- `POST /login` – Force a fresh SLT session token (used by manual triggers).
 - `GET /health` – Simple health check.
 
 The cron scheduler defined in `wrangler.toml` runs twice every hour (at `:29` and `:59`) so that a fresh snapshot is captured frequently and a final one lands at 23:59 just before the daily reset.
