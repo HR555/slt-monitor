@@ -381,7 +381,21 @@ function getErrorMessage(error: unknown): string {
 }
 
 async function getMonthlyUsage(env: Env): Promise<MonthlyUsagePoint[]> {
-  const { startUtc, endUtc, dayKeys } = getColomboMonthBounds(new Date());
+  const today = new Date();
+  
+  // Generate day keys for the last 9 days including today (8 days ago through today)
+  const dayKeys: string[] = [];
+  for (let i = 8; i >= 0; i--) {
+    const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+    dayKeys.push(formatColomboDayKey(date));
+  }
+
+  // Get the earliest date (8 days ago) and today for the query
+  const earliestDate = new Date(today.getTime() - 8 * 24 * 60 * 60 * 1000);
+  const { startUtc } = getColomboDayBounds(earliestDate);
+  const { endUtc } = getColomboDayBounds(today);
+  // endUtc is already the start of tomorrow, so we can use it directly
+
   const query = `
     SELECT timestamp, vas_used_gb
     FROM usage_log
