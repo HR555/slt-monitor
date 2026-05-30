@@ -4,11 +4,6 @@ const JSON_HEADERS = {
     "content-type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*"
 };
-const CSS_HEADERS = {
-    "content-type": "text/css; charset=utf-8",
-    "Cache-Control": "public, max-age=300",
-    "Access-Control-Allow-Origin": "*"
-};
 const SLT_CLIENT_ID = "b7402e9d66808f762ccedbe42c20668e";
 const LOGIN_ENDPOINT = "https://omniscapp.slt.lk/slt/ext/api/Account/Login";
 const USAGE_ENDPOINT = "https://omniscapp.slt.lk/slt/ext/api/BBVAS/UsageSummary";
@@ -38,7 +33,7 @@ export default {
             default:
                 return new Response(JSON.stringify({
                     message: "SLT usage monitor",
-                    endpoints: ["/usage?days=7", "/trigger", "/health"],
+                    endpoints: ["/usage?days=7", "/intraday?day=YYYY-MM-DD", "/trigger", "/health"],
                     crons: ["29 * * * *", "59 * * * *"]
                 }), { headers: JSON_HEADERS });
         }
@@ -261,7 +256,18 @@ function getErrorMessage(error) {
     return String(error);
 }
 async function getMonthlyUsage(env) {
-    const { startUtc, endUtc, dayKeys } = getColomboMonthBounds(new Date());
+    const today = new Date();
+    // Generate day keys for the last 9 days including today (8 days ago through today)
+    const dayKeys = [];
+    for (let i = 8; i >= 0; i--) {
+        const date = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+        dayKeys.push(formatColomboDayKey(date));
+    }
+    // Get the earliest date (8 days ago) and today for the query
+    const earliestDate = new Date(today.getTime() - 8 * 24 * 60 * 60 * 1000);
+    const { startUtc } = getColomboDayBounds(earliestDate);
+    const { endUtc } = getColomboDayBounds(today);
+    // endUtc is already the start of tomorrow, so we can use it directly
     const query = `
     SELECT timestamp, vas_used_gb
     FROM usage_log
