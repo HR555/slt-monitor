@@ -1,4 +1,5 @@
 import { renderDashboard } from "./dashboard";
+import { logoJpg, faviconIco, favicon16, favicon32 } from "./assets";
 const DEFAULT_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36";
 const JSON_HEADERS = {
     "content-type": "application/json; charset=utf-8",
@@ -17,6 +18,14 @@ export default {
         switch (url.pathname) {
             case "/":
                 return renderHome(env);
+            case "/logo.jpg":
+                return base64ToResponse(logoJpg, "image/jpeg");
+            case "/favicon.ico":
+                return base64ToResponse(faviconIco, "image/x-icon");
+            case "/favicon-16x16.png":
+                return base64ToResponse(favicon16, "image/png");
+            case "/favicon-32x32.png":
+                return base64ToResponse(favicon32, "image/png");
             case "/usage":
                 return getUsage(env, url);
             case "/intraday":
@@ -400,4 +409,18 @@ function buildIntradaySlots(startUtc, endUtc) {
 }
 function formatColomboTimeLabel(date) {
     return COLOMBO_TIME_FORMATTER.format(date);
+}
+function base64ToResponse(base64, contentType) {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return new Response(bytes, {
+        headers: {
+            "content-type": contentType,
+            "cache-control": "public, max-age=86400"
+        }
+    });
 }

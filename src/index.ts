@@ -4,6 +4,7 @@ import {
   type MonthlyUsagePoint,
   type DailyUsagePoint
 } from "./dashboard";
+import { logoJpg, faviconIco, favicon16, favicon32 } from "./assets";
 
 interface Env {
   DB: D1Database;
@@ -82,6 +83,14 @@ export default {
     switch (url.pathname) {
       case "/":
         return renderHome(env);
+      case "/logo.jpg":
+        return base64ToResponse(logoJpg, "image/jpeg");
+      case "/favicon.ico":
+        return base64ToResponse(faviconIco, "image/x-icon");
+      case "/favicon-16x16.png":
+        return base64ToResponse(favicon16, "image/png");
+      case "/favicon-32x32.png":
+        return base64ToResponse(favicon32, "image/png");
       case "/usage":
         return getUsage(env, url);
       case "/intraday":
@@ -552,4 +561,19 @@ function buildIntradaySlots(startUtc: Date, endUtc: Date) {
 
 function formatColomboTimeLabel(date: Date): string {
   return COLOMBO_TIME_FORMATTER.format(date);
+}
+
+function base64ToResponse(base64: string, contentType: string): Response {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return new Response(bytes, {
+    headers: {
+      "content-type": contentType,
+      "cache-control": "public, max-age=86400"
+    }
+  });
 }

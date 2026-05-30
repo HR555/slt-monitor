@@ -1,31 +1,34 @@
 export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selectedDayKey, todayDayKey }) {
-    const vasUsed = latest?.vas_used_gb ?? 0;
-    const baseUsed = latest?.used_gb ?? 0;
-    const remaining = Math.max(dailyLimitGb - vasUsed, 0);
-    const percentage = Math.min((vasUsed / dailyLimitGb) * 100, 100);
-    const reportedAt = latest ? new Date(latest.timestamp).toLocaleString("en-GB", { timeZone: "Asia/Colombo" }) : "—";
-    const packageName = latest?.package_name ?? "Unknown package";
-    const selectedDayTitle = formatSelectedDayTitle(selectedDayKey, todayDayKey);
-    const serializedIntraday = JSON.stringify(intraday).replace(/</g, "\\u003c");
-    return `
+  const vasUsed = latest?.vas_used_gb ?? 0;
+  const baseUsed = latest?.used_gb ?? 0;
+  const remaining = Math.max(dailyLimitGb - vasUsed, 0);
+  const percentage = Math.min((vasUsed / dailyLimitGb) * 100, 100);
+  const reportedAt = latest ? new Date(latest.timestamp).toLocaleString("en-GB", { timeZone: "Asia/Colombo" }) : "—";
+  const packageName = latest?.package_name ?? "Unknown package";
+  const selectedDayTitle = formatSelectedDayTitle(selectedDayKey, todayDayKey);
+  const serializedIntraday = JSON.stringify(intraday).replace(/</g, "\\u003c");
+  return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SLT Fiber Usage Monitor</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="shortcut icon" href="/favicon.ico">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
     
     :root {
-      --bg-dark: #030712;
-      --panel-bg: rgba(17, 24, 39, 0.45);
-      --panel-border: rgba(255, 255, 255, 0.08);
+      --bg-dark: #020b1c;
+      --panel-bg: rgba(10, 25, 47, 0.45);
+      --panel-border: rgba(255, 255, 255, 0.06);
       --text-primary: #f3f4f6;
-      --text-secondary: #9ca3af;
-      --accent-base: linear-gradient(135deg, #3b82f6, #6366f1);
-      --accent-vas: linear-gradient(135deg, #ec4899, #8b5cf6);
-      --emerald: #10b981;
+      --text-secondary: #94a3b8;
+      --accent-base: linear-gradient(135deg, #00adef, #005fa9);
+      --accent-vas: linear-gradient(135deg, #4eb848, #00adef);
+      --emerald: #4eb848;
     }
 
     * {
@@ -38,9 +41,9 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
       min-height: 100vh;
       background-color: var(--bg-dark);
       background-image: 
-        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.1) 0px, transparent 50%),
-        radial-gradient(at 50% 50%, rgba(3, 7, 18, 1) 0px, transparent 100%);
+        radial-gradient(at 0% 0%, rgba(0, 174, 240, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(78, 184, 72, 0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(2, 11, 28, 1) 0px, transparent 100%);
       color: var(--text-primary);
       font-family: 'Outfit', 'Inter', system-ui, sans-serif;
       display: flex;
@@ -87,19 +90,11 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
       width: 40px;
       height: 40px;
       border-radius: 12px;
-      background: var(--accent-base);
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-    }
-
-    .logo-icon svg {
-      width: 22px;
-      height: 22px;
-      stroke: #fff;
-      fill: none;
-      stroke-width: 2;
+      box-shadow: 0 4px 12px rgba(0, 95, 169, 0.2);
+      overflow: hidden;
     }
 
     .logo-text h1 {
@@ -356,8 +351,8 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
       left: 50%;
       width: 28px;
       height: 28px;
-      border: 2px solid rgba(99, 102, 241, 0.2);
-      border-top-color: #6366f1;
+      border: 2px solid rgba(0, 174, 240, 0.2);
+      border-top-color: #00adef;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       z-index: 6;
@@ -553,7 +548,7 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
 
     .tooltip-value {
       font-weight: 700;
-      color: #a5b4fc;
+      color: #00adef;
       font-size: 0.9rem;
     }
 
@@ -586,7 +581,7 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
     }
 
     button {
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      background: linear-gradient(135deg, #00adef, #005fa9);
       color: #fff;
       border: none;
       border-radius: 12px;
@@ -595,12 +590,12 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+      box-shadow: 0 4px 12px rgba(0, 95, 169, 0.2);
     }
     
     button:hover {
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+      box-shadow: 0 6px 20px rgba(0, 95, 169, 0.4);
     }
 
     button:active {
@@ -641,9 +636,7 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
     <header class="header">
       <div class="logo-section">
         <div class="logo-icon">
-          <svg viewBox="0 0 24 24">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-          </svg>
+          <img src="/logo.jpg" alt="SLT Logo" style="width: 100%; height: 100%; object-fit: cover; border-radius: inherit;" />
         </div>
         <div class="logo-text">
           <h1>SLT Usage Monitor</h1>
@@ -657,7 +650,7 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
     </header>
 
     ${latest
-        ? `
+      ? `
     <section class="stats-grid">
       <!-- Card 1: VAS Gauge -->
       <div class="stats-card">
@@ -721,7 +714,7 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
       </div>
     </section>
         `
-        : `<div class="empty">No usage entries recorded yet.</div>`}
+      : `<div class="empty">No usage entries recorded yet.</div>`}
 
     <section class="charts-grid">
       <!-- Intraday activity line chart -->
@@ -735,17 +728,17 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
         <div class="line-card" data-limit="${dailyLimitGb}">
           <div id="lineChartContainer">
             ${intraday.length
-        ? `
+      ? `
             <div class="line-wrapper" id="lineChartWrapper">
               <svg viewBox="0 0 100 100" preserveAspectRatio="none" id="chartSvg">
                 <defs>
                   <linearGradient id="lineFillGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stop-color="#6366f1" stop-opacity="0.8" />
-                    <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0" />
+                    <stop offset="0%" stop-color="#00adef" stop-opacity="0.8" />
+                    <stop offset="100%" stop-color="#005fa9" stop-opacity="0" />
                   </linearGradient>
                   <linearGradient id="lineStrokeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stop-color="#6366f1" />
-                    <stop offset="100%" stop-color="#ec4899" />
+                    <stop offset="0%" stop-color="#00adef" />
+                    <stop offset="100%" stop-color="#4eb848" />
                   </linearGradient>
                 </defs>
                 <g class="line-grid">
@@ -756,17 +749,17 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
                 <path class="line-fill" d="${bezierArea(intraday, dailyLimitGb)}" />
                 <path class="line-path" d="${bezierPath(intraday, dailyLimitGb)}" />
                 <line id="crosshair" x1="0" y1="0" x2="0" y2="100" stroke="rgba(255, 255, 255, 0.25)" stroke-width="0.5" stroke-dasharray="2 2" style="display: none;" />
-                <circle id="activePoint" cx="0" cy="0" r="1.5" fill="#a5b4fc" stroke="#fff" stroke-width="0.5" style="display: none; filter: drop-shadow(0 0 4px #6366f1);" />
+                <circle id="activePoint" cx="0" cy="0" r="1.5" fill="#00adef" stroke="#fff" stroke-width="0.5" style="display: none; filter: drop-shadow(0 0 4px #00aef0);" />
               </svg>
               <div id="chartTooltip" class="chart-tooltip" style="opacity: 0; left: 0; top: 0; position: absolute;"></div>
             </div>
             <div class="axis">
               ${intraday
-            .map((point, idx) => (idx % 4 === 0 || idx === intraday.length - 1 ? `<span>${point.label}</span>` : ""))
-            .join("")}
+        .map((point, idx) => (idx % 4 === 0 || idx === intraday.length - 1 ? `<span>${point.label}</span>` : ""))
+        .join("")}
             </div>
                 `
-        : `<div class="empty">No samples for the selected day yet.</div>`}
+      : `<div class="empty">No samples for the selected day yet.</div>`}
           </div>
         </div>
       </div>
@@ -781,8 +774,8 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
         </div>
         <div class="chart-bars">
           ${monthly.length
-        ? monthly
-            .map((point) => `
+      ? monthly
+        .map((point) => `
           <div class="chart-bar${point.dayKey === selectedDayKey ? " selected" : ""}" data-day-key="${point.dayKey}" role="button" tabindex="0" aria-label="Show snapshots for ${point.dayKey}" aria-pressed="${point.dayKey === selectedDayKey}">
             <div class="bar-column">
               <span class="bar-value">${point.vasUsed.toFixed(1)} GB</span>
@@ -792,8 +785,8 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
             </div>
             <span class="bar-label">${point.label}</span>
           </div>`)
-            .join("")
-        : `<div class="empty">No samples for this month yet.</div>`}
+        .join("")
+      : `<div class="empty">No samples for this month yet.</div>`}
         </div>
       </div>
     </section>
@@ -806,7 +799,7 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
         </svg>
         <span>${latest ? `Last synced · ${reportedAt}` : "Waiting for first sync"}</span>
       </div>
-      <button id="triggerBtn">Trigger Fetch</button>
+      <button id="triggerBtn">Update Now</button>
     </footer>
   </main>
 
@@ -971,12 +964,12 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
             <svg viewBox="0 0 100 100" preserveAspectRatio="none" id="chartSvg">
               <defs>
                 <linearGradient id="lineFillGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stop-color="#6366f1" stop-opacity="0.8" />
-                  <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0" />
+                  <stop offset="0%" stop-color="#00adef" stop-opacity="0.8" />
+                  <stop offset="100%" stop-color="#005fa9" stop-opacity="0" />
                 </linearGradient>
                 <linearGradient id="lineStrokeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#6366f1" />
-                  <stop offset="100%" stop-color="#ec4899" />
+                  <stop offset="0%" stop-color="#00adef" />
+                  <stop offset="100%" stop-color="#4eb848" />
                 </linearGradient>
               </defs>
               <g class="line-grid">
@@ -987,7 +980,7 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
               <path class="line-fill" d="\${buildBezierArea(series)}" />
               <path class="line-path" d="\${buildBezierPath(series)}" />
               <line id="crosshair" x1="0" y1="0" x2="0" y2="100" stroke="rgba(255, 255, 255, 0.25)" stroke-width="0.5" stroke-dasharray="2 2" style="display: none;" />
-              <circle id="activePoint" cx="0" cy="0" r="1.5" fill="#a5b4fc" stroke="#fff" stroke-width="0.5" style="display: none; filter: drop-shadow(0 0 4px #6366f1);" />
+              <circle id="activePoint" cx="0" cy="0" r="1.5" fill="#00adef" stroke="#fff" stroke-width="0.5" style="display: none; filter: drop-shadow(0 0 4px #00aef0);" />
             </svg>
             <div id="chartTooltip" class="chart-tooltip" style="opacity: 0; left: 0; top: 0; position: absolute;"></div>
           </div>
@@ -1111,45 +1104,45 @@ export function renderDashboard({ latest, dailyLimitGb, intraday, monthly, selec
 `;
 }
 function bezierPath(series, limit) {
-    if (series.length === 0)
-        return "";
-    const lastIndex = series.length - 1 || 1;
-    let d = "";
-    series.forEach((point, idx) => {
-        const x = (idx / lastIndex) * 100;
-        const y = 100 - Math.min((point.vasUsed / limit) * 100, 100);
-        if (idx === 0) {
-            d = `M ${x.toFixed(2)},${y.toFixed(2)}`;
-        }
-        else {
-            const prevX = ((idx - 1) / lastIndex) * 100;
-            const prevY = 100 - Math.min((series[idx - 1].vasUsed / limit) * 100, 100);
-            const cp1x = prevX + (x - prevX) / 3;
-            const cp1y = prevY;
-            const cp2x = prevX + (2 * (x - prevX)) / 3;
-            const cp2y = y;
-            d += ` C ${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${x.toFixed(2)},${y.toFixed(2)}`;
-        }
-    });
-    return d;
+  if (series.length === 0)
+    return "";
+  const lastIndex = series.length - 1 || 1;
+  let d = "";
+  series.forEach((point, idx) => {
+    const x = (idx / lastIndex) * 100;
+    const y = 100 - Math.min((point.vasUsed / limit) * 100, 100);
+    if (idx === 0) {
+      d = `M ${x.toFixed(2)},${y.toFixed(2)}`;
+    }
+    else {
+      const prevX = ((idx - 1) / lastIndex) * 100;
+      const prevY = 100 - Math.min((series[idx - 1].vasUsed / limit) * 100, 100);
+      const cp1x = prevX + (x - prevX) / 3;
+      const cp1y = prevY;
+      const cp2x = prevX + (2 * (x - prevX)) / 3;
+      const cp2y = y;
+      d += ` C ${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${x.toFixed(2)},${y.toFixed(2)}`;
+    }
+  });
+  return d;
 }
 function bezierArea(series, limit) {
-    const path = bezierPath(series, limit);
-    if (!path)
-        return "";
-    return `${path} L 100,100 L 0,100 Z`;
+  const path = bezierPath(series, limit);
+  if (!path)
+    return "";
+  return `${path} L 100,100 L 0,100 Z`;
 }
 function formatSelectedDayTitle(dayKey, todayDayKey) {
-    if (dayKey === todayDayKey) {
-        return "Today";
-    }
-    const parsed = Date.parse(`${dayKey}T00:00:00+05:30`);
-    if (Number.isNaN(parsed)) {
-        return dayKey;
-    }
-    return new Date(parsed).toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric"
-    });
+  if (dayKey === todayDayKey) {
+    return "Today";
+  }
+  const parsed = Date.parse(`${dayKey}T00:00:00+05:30`);
+  if (Number.isNaN(parsed)) {
+    return dayKey;
+  }
+  return new Date(parsed).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric"
+  });
 }

@@ -49,18 +49,21 @@ export function renderDashboard({
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SLT Fiber Usage Monitor</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="shortcut icon" href="/favicon.ico">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
     
     :root {
-      --bg-dark: #030712;
-      --panel-bg: rgba(17, 24, 39, 0.45);
-      --panel-border: rgba(255, 255, 255, 0.08);
+      --bg-dark: #020b1c;
+      --panel-bg: rgba(10, 25, 47, 0.45);
+      --panel-border: rgba(255, 255, 255, 0.06);
       --text-primary: #f3f4f6;
-      --text-secondary: #9ca3af;
-      --accent-base: linear-gradient(135deg, #3b82f6, #6366f1);
-      --accent-vas: linear-gradient(135deg, #ec4899, #8b5cf6);
-      --emerald: #10b981;
+      --text-secondary: #94a3b8;
+      --accent-base: linear-gradient(135deg, #00adef, #005fa9);
+      --accent-vas: linear-gradient(135deg, #4eb848, #00adef);
+      --emerald: #4eb848;
     }
 
     * {
@@ -73,9 +76,9 @@ export function renderDashboard({
       min-height: 100vh;
       background-color: var(--bg-dark);
       background-image: 
-        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.1) 0px, transparent 50%),
-        radial-gradient(at 50% 50%, rgba(3, 7, 18, 1) 0px, transparent 100%);
+        radial-gradient(at 0% 0%, rgba(0, 174, 240, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(78, 184, 72, 0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(2, 11, 28, 1) 0px, transparent 100%);
       color: var(--text-primary);
       font-family: 'Outfit', 'Inter', system-ui, sans-serif;
       display: flex;
@@ -122,19 +125,11 @@ export function renderDashboard({
       width: 40px;
       height: 40px;
       border-radius: 12px;
-      background: var(--accent-base);
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-    }
-
-    .logo-icon svg {
-      width: 22px;
-      height: 22px;
-      stroke: #fff;
-      fill: none;
-      stroke-width: 2;
+      box-shadow: 0 4px 12px rgba(0, 95, 169, 0.2);
+      overflow: hidden;
     }
 
     .logo-text h1 {
@@ -391,8 +386,8 @@ export function renderDashboard({
       left: 50%;
       width: 28px;
       height: 28px;
-      border: 2px solid rgba(99, 102, 241, 0.2);
-      border-top-color: #6366f1;
+      border: 2px solid rgba(0, 174, 240, 0.2);
+      border-top-color: #00adef;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       z-index: 6;
@@ -588,7 +583,7 @@ export function renderDashboard({
 
     .tooltip-value {
       font-weight: 700;
-      color: #a5b4fc;
+      color: #00adef;
       font-size: 0.9rem;
     }
 
@@ -621,7 +616,7 @@ export function renderDashboard({
     }
 
     button {
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      background: linear-gradient(135deg, #00adef, #005fa9);
       color: #fff;
       border: none;
       border-radius: 12px;
@@ -630,12 +625,12 @@ export function renderDashboard({
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+      box-shadow: 0 4px 12px rgba(0, 95, 169, 0.2);
     }
     
     button:hover {
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+      box-shadow: 0 6px 20px rgba(0, 95, 169, 0.4);
     }
 
     button:active {
@@ -676,9 +671,7 @@ export function renderDashboard({
     <header class="header">
       <div class="logo-section">
         <div class="logo-icon">
-          <svg viewBox="0 0 24 24">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-          </svg>
+          <img src="/logo.jpg" alt="SLT Logo" style="width: 100%; height: 100%; object-fit: cover; border-radius: inherit;" />
         </div>
         <div class="logo-text">
           <h1>SLT Usage Monitor</h1>
@@ -778,12 +771,12 @@ export function renderDashboard({
               <svg viewBox="0 0 100 100" preserveAspectRatio="none" id="chartSvg">
                 <defs>
                   <linearGradient id="lineFillGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stop-color="#6366f1" stop-opacity="0.8" />
-                    <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0" />
+                    <stop offset="0%" stop-color="#00adef" stop-opacity="0.8" />
+                    <stop offset="100%" stop-color="#005fa9" stop-opacity="0" />
                   </linearGradient>
                   <linearGradient id="lineStrokeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stop-color="#6366f1" />
-                    <stop offset="100%" stop-color="#ec4899" />
+                    <stop offset="0%" stop-color="#00adef" />
+                    <stop offset="100%" stop-color="#4eb848" />
                   </linearGradient>
                 </defs>
                 <g class="line-grid">
@@ -794,7 +787,7 @@ export function renderDashboard({
                 <path class="line-fill" d="${bezierArea(intraday, dailyLimitGb)}" />
                 <path class="line-path" d="${bezierPath(intraday, dailyLimitGb)}" />
                 <line id="crosshair" x1="0" y1="0" x2="0" y2="100" stroke="rgba(255, 255, 255, 0.25)" stroke-width="0.5" stroke-dasharray="2 2" style="display: none;" />
-                <circle id="activePoint" cx="0" cy="0" r="1.5" fill="#a5b4fc" stroke="#fff" stroke-width="0.5" style="display: none; filter: drop-shadow(0 0 4px #6366f1);" />
+                <circle id="activePoint" cx="0" cy="0" r="1.5" fill="#00adef" stroke="#fff" stroke-width="0.5" style="display: none; filter: drop-shadow(0 0 4px #00aef0);" />
               </svg>
               <div id="chartTooltip" class="chart-tooltip" style="opacity: 0; left: 0; top: 0; position: absolute;"></div>
             </div>
@@ -1017,12 +1010,12 @@ export function renderDashboard({
             <svg viewBox="0 0 100 100" preserveAspectRatio="none" id="chartSvg">
               <defs>
                 <linearGradient id="lineFillGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stop-color="#6366f1" stop-opacity="0.8" />
-                  <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0" />
+                  <stop offset="0%" stop-color="#00adef" stop-opacity="0.8" />
+                  <stop offset="100%" stop-color="#005fa9" stop-opacity="0" />
                 </linearGradient>
                 <linearGradient id="lineStrokeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#6366f1" />
-                  <stop offset="100%" stop-color="#ec4899" />
+                  <stop offset="0%" stop-color="#00adef" />
+                  <stop offset="100%" stop-color="#4eb848" />
                 </linearGradient>
               </defs>
               <g class="line-grid">
@@ -1033,7 +1026,7 @@ export function renderDashboard({
               <path class="line-fill" d="\${buildBezierArea(series)}" />
               <path class="line-path" d="\${buildBezierPath(series)}" />
               <line id="crosshair" x1="0" y1="0" x2="0" y2="100" stroke="rgba(255, 255, 255, 0.25)" stroke-width="0.5" stroke-dasharray="2 2" style="display: none;" />
-              <circle id="activePoint" cx="0" cy="0" r="1.5" fill="#a5b4fc" stroke="#fff" stroke-width="0.5" style="display: none; filter: drop-shadow(0 0 4px #6366f1);" />
+              <circle id="activePoint" cx="0" cy="0" r="1.5" fill="#00adef" stroke="#fff" stroke-width="0.5" style="display: none; filter: drop-shadow(0 0 4px #00aef0);" />
             </svg>
             <div id="chartTooltip" class="chart-tooltip" style="opacity: 0; left: 0; top: 0; position: absolute;"></div>
           </div>
